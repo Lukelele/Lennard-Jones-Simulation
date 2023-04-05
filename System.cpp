@@ -66,9 +66,57 @@ void System::ReadFromTXT(const char* filepath)
 }
 
 
-void System::Simulate()
+
+
+void System::Simulate(float duration, float dt)
 {
+    ofstream savefile;
+    savefile.open("/Users/lukelele/Documents/Scientific Computing/Year 2/Assessments/Assessment4/FinalAssessment/FinalAssessment/output.csv");
+    if (!savefile.is_open()) {
+        cout << "save file cannot be opened" << endl;
+        return;
+    }
     
+    
+    for (int i = 0; i < atoms.size(); i++) {
+        savefile << "atom" << i << "_x" << ',';
+        savefile << "atom" << i << "_y" << ',';
+        savefile << "atom" << i << "_z" << ',';
+        savefile << "atom" << i << "_vx" << ',';
+        savefile << "atom" << i << "_vy" << ',';
+        savefile << "atom" << i << "_vz" << ',';
+        savefile << "atom" << i << "_ax" << ',';
+        savefile << "atom" << i << "_ay" << ',';
+        savefile << "atom" << i << "_az";
+    }
+    
+    savefile << endl;
+    
+    for (float t = 0; t < duration; t += dt) {
+        for (int i = 0; i < atoms.size(); i++) {
+            Vector3 currentPosition = atoms[i].GetPosition();
+            Vector3 currentVelocity = atoms[i].GetVelocity();
+            Vector3 currentAcceleration = atoms[i].GetAcceleration();
+            atoms[i].SetVelocity(currentVelocity + currentAcceleration * (0.5 * dt));
+            atoms[i].SetPosition(currentPosition + currentVelocity * dt);
+            updateAcceleration();
+            atoms[i].SetVelocity(atoms[i].GetVelocity() + atoms[i].GetAcceleration() * (0.5 * dt));
+
+            savefile << to_string(atoms[i].GetPosition().x) << ',';
+            savefile << to_string(atoms[i].GetPosition().y) << ',';
+            savefile << to_string(atoms[i].GetPosition().z) << ',';
+            savefile << to_string(atoms[i].GetVelocity().x) << ',';
+            savefile << to_string(atoms[i].GetVelocity().y) << ',';
+            savefile << to_string(atoms[i].GetVelocity().z) << ',';
+            savefile << to_string(atoms[i].GetAcceleration().x) << ',';
+            savefile << to_string(atoms[i].GetAcceleration().y) << ',';
+            savefile << to_string(atoms[i].GetAcceleration().z);
+
+        }
+        savefile << endl;
+    }
+    
+    savefile.close();
 }
 
 
@@ -84,13 +132,16 @@ void System::updateAcceleration()
         for (int j = 0; j < atoms.size(); j++) {
             if (i != j) {
                 Vector3 deltaR = atoms[j].GetPosition() - atoms[i].GetPosition();
+                //deltaR.normalise() gives the direction of the force, multiplied by the magnitude of the force given by the field
                 acc = acc + deltaR.Normalise() * field(deltaR.Magnitude());
             }
         }
         //update the acceleration at the end of the i loop
-        atoms[i].SetAcceleration(acc);
+        atoms[i].SetAcceleration(acc / atoms[i].GetMass());
+        cout << acc.x << "   " << acc.y << "   " << acc.z << endl;
     }
 }
+
 
 
 void System::verlet()
