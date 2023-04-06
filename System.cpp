@@ -114,8 +114,7 @@ void System::Simulate(float duration, float dt)
             savefile << to_string(atoms[i].GetAcceleration().y * 1e9) << ',';
             savefile << to_string(atoms[i].GetAcceleration().z * 1e9) << ',';
             
-            cout << atoms[i].GetPosition().x << "  " << atoms[i].GetPosition().y << "  " << atoms[i].GetPosition().z << endl;
-
+            
         }
         savefile << endl;
     }
@@ -130,18 +129,22 @@ void System::updateAcceleration()
 {
     for (int i = 0; i < atoms.size(); i++) {
         //initialise the acceleration vector to zero with each new atom
-        Vector3 acc(0,0,0);
+        Vector3 force(0,0,0);
 
         //for each atom, loop through all other atoms in the system except for itself to calculate the acceleration
         for (int j = 0; j < atoms.size(); j++) {
             if (i != j) {
                 Vector3 deltaR = atoms[j].GetPosition() - atoms[i].GetPosition();
                 //deltaR.normalise() gives the direction of the force, multiplied by the magnitude of the force given by the field
-                acc = acc + deltaR.Normalise() * field(deltaR.Magnitude());
+                force = force + deltaR.Normalise() * field(deltaR.Magnitude(), 1, 1);
             }
         }
+        if (i == 0) {
+            cout << atoms[i].GetPosition().x << "  " << atoms[i].GetPosition().y << "  " << atoms[i].GetPosition().z << "  |||  " << atoms[i].GetVelocity().x << "  " << atoms[i].GetVelocity().y << "  " << atoms[i].GetVelocity().z << "  |||  " << atoms[i].GetAcceleration().x << "  " << atoms[i].GetAcceleration().y << "  " << atoms[i].GetAcceleration().z << endl;
+        }
+        
         //update the acceleration at the end of the i loop
-        atoms[i].SetAcceleration(acc / atoms[i].GetMass());
+        atoms[i].SetAcceleration(force / atoms[i].GetMass());
     }
 }
 
@@ -161,5 +164,5 @@ double System::potential(double r, double eps, double sig)
 
 double System::field(double r, double eps, double sig)
 {
-    return -4 * eps * ((6 * pow(sig, 6) / pow(r, 7)) - (12 * pow(sig, 12) / pow(r, 13)));
+    return (24 * eps * pow(sig, 6) * (pow(r, 6) - 2 * pow(sig, 6))) / pow(r, 13);
 }

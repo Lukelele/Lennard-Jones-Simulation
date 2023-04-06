@@ -38,6 +38,7 @@ def animate(num, data1, line1, data2, line2):
     line2.set_alpha(0.7)
     line2.set_data(data2[0:2, :num])
     line2.set_3d_properties(data2[2, :num])
+    
 
 
 t = np.arange(0, len(df['atom0_x']), 1)
@@ -49,21 +50,17 @@ x1 = df['atom1_x'] * 1e-9
 y1 = df['atom1_y'] * 1e-9
 z1 = df['atom1_z'] * 1e-9
 
-data = np.array([x, y, z, t])
-data1 = np.array([x1, y1, z1, t])
+data1 = np.array([x, y, z, t])
+data2 = np.array([x1, y1, z1, t])
 
 N = len(t)
 fig = plt.figure()
 ax = fig.add_subplot(projection='3d')
 
-line, = plt.plot(data[0], data[1], data[2], lw=7, c='red')
-line1, = plt.plot(data1[0], data1[1], data1[2], lw=7, c='blue')
-line_ani = animation.FuncAnimation(fig, animate, frames=N, fargs=(data, line, data1, line1), interval=50, blit=False)
+line1, = plt.plot(data1[0], data1[1], data1[2], lw=7, c='red')
+line2, = plt.plot(data2[0], data2[1], data2[2], lw=7, c='blue')
+line_ani = animation.FuncAnimation(fig, animate, frames=N, fargs=(data1, line1, data2, line2), interval=5, blit=False)
 
-#animate another line using data1
-# line1, = plt.plot(data1[0], data1[1], data1[2], lw=7, c='blue')
-# line_ani1 = animation.FuncAnimation(fig, animate, frames=N, fargs=(data1, line1), interval=50, blit=False)
-
-line_ani.save('animation.mp4', writer='ffmpeg', fps=30)
+# line_ani.save('animation.mp4', writer='ffmpeg', fps=30)
 
 plt.show()
