@@ -27,4 +27,3 @@ private:
     double potential(double r, double eps=1.73466e-21, double sig=0.3345e-9);
     double field(double r, double eps=1.73466e-21, double sig=0.3345e-9);
 };
-
