@@ -18,12 +18,15 @@ public:
     
     void Add(Atom &atom);
     void ReadFromTXT(const char* filepath);
-    void Simulate(float duration, float dt);
+    void Simulate(float duration, float dt, Vector3 simulationBox=Vector3(0,0,0));
 private:
     vector<Atom> atoms;
     
-    void updateAcceleration();
-    void verlet();
+    void updateAcceleration(int atomIndex);
+    void updateOnRebound(Vector3 boundaryVector, int atomIndex);
+    
     double potential(double r, double eps=1.73466e-21, double sig=0.3345e-9);
     double field(double r, double eps=1.73466e-21, double sig=0.3345e-9);
+    void createSimulationHeader(ofstream &savefile);
+    void logSimulationData(ofstream &savefile, int i);
 };
