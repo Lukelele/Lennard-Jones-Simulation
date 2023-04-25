@@ -81,19 +81,30 @@ void System::Simulate(float duration, float dt, Vector3 simulationBox)
     
     for (float t = 0; t < duration; t += dt) {
         savefile << to_string(t * 1e9) << ',';
+        
         for (int i = 0; i < atoms.size(); i++) {
             Vector3 currentPosition = atoms[i].GetPosition();
             Vector3 currentVelocity = atoms[i].GetVelocity();
             Vector3 currentAcceleration = atoms[i].GetAcceleration();
-            atoms[i].SetVelocity(currentVelocity + currentAcceleration * (0.5 * dt));
-            atoms[i].SetPosition(currentPosition + currentVelocity * dt);
-            updateAcceleration(i);
-            atoms[i].SetVelocity(atoms[i].GetVelocity() + atoms[i].GetAcceleration() * (0.5 * dt));
 
-            updateOnRebound(Vector3(1e-9, 1e-9, 1e-9), i);
+            atoms[i].SetVelocity(currentVelocity + currentAcceleration * 0.5 * dt);
+            atoms[i].SetPosition(currentPosition + currentVelocity * dt + currentAcceleration * 0.5 * dt * dt);
+            
+            //updateOnRebound(Vector3(3, 3, 3), i);
+            
+            if (i == 0) {
+                cout << atoms[i].GetPosition().x - atoms[1].GetPosition().x << "  " << atoms[i].GetPosition().y - atoms[1].GetPosition().y << "  " << atoms[i].GetPosition().z - atoms[1].GetPosition().z << "  |||   " << atoms[i].GetAcceleration().x * 6.6335209e-26 << "  " << atoms[i].GetAcceleration().y *6.6335209e-26 << "  " << atoms[i].GetAcceleration().z * 6.6335209e-26 << endl;;
+            }
             
             logSimulationData(savefile, i);
         }
+        
+        updateAcceleration();
+        
+        for (int i = 0; i < atoms.size(); i++) {
+            atoms[i].SetVelocity(atoms[i].GetVelocity() + atoms[i].GetAcceleration() * 0.5 * dt);
+        }
+        
         savefile << endl;
     }
     
@@ -102,20 +113,22 @@ void System::Simulate(float duration, float dt, Vector3 simulationBox)
 
 
 
-void System::updateAcceleration(int i)
+void System::updateAcceleration()
 {
-    Vector3 force(0,0,0);
-    //for each atom, loop through all other atoms in the system except for itself to calculate the acceleration
-    for (int j = 0; j < atoms.size(); j++) {
-        if (i != j) {
-            Vector3 deltaR = atoms[j].GetPosition() - atoms[i].GetPosition();
-            //deltaR.normalise() gives the direction of the force, multiplied by the magnitude of the force given by the field
-            force = force + deltaR.Normalise() * field(deltaR.Magnitude());
-        }
-    }
+    //loop through every body
+    for (int i = 0; i < atoms.size(); i++) {
+        //initialise the acceleration vector to zero with each new body
+        Vector3 acc(0,0,0);
 
-    //return the acceleration at the end of the i loop
-    atoms[i].SetAcceleration(force / atoms[i].GetMass());
+        //for each body, loop through all other bodies except for itself to calculate the acceleration according to equation1
+        for (int j = 0; j < atoms.size(); j++) {
+            if (i != j) {
+                acc = acc + (atoms[j].GetPosition() - atoms[i].GetPosition()).Normalise() * field((atoms[j].GetPosition() - atoms[i].GetPosition()).Magnitude()) / atoms[i].GetMass();
+            }
+        }
+        //update the acceleration at the end of the i loop
+        atoms[i].SetAcceleration(acc);
+    }
 }
 
 
@@ -124,19 +137,33 @@ void System::updateOnRebound(Vector3 boundaryVector, int i)
     Vector3 currentPosition = atoms[i].GetPosition();
     Vector3 currentVelocity = atoms[i].GetVelocity();
     
-    if (currentPosition.x >= boundaryVector.x || currentPosition.x <= -boundaryVector.x) {
+    if (currentPosition.x > boundaryVector.x) {
         // if the particle goes out of bounds in between frames, it means it must rebound in the time between frames and have already travelled back a distance, simply reversing the velocity does not address the problem that the particle has travelled extra distance, therefore this extra distance has to be offset in the opposite direction before the next frame
         atoms[i].SetPosition(Vector3(boundaryVector.x - (currentPosition.x - boundaryVector.x), currentPosition.y, currentPosition.z));
         atoms[i].SetVelocity(Vector3(-currentVelocity.x, currentVelocity.y, currentVelocity.z));
     }
-    if (currentPosition.y >= boundaryVector.y || currentPosition.y <= -boundaryVector.y) {
-        atoms[i].SetPosition(Vector3(boundaryVector.y - (currentPosition.y - boundaryVector.y), currentPosition.y, currentPosition.z));
+    else if (currentPosition.x < -boundaryVector.x) {
+        atoms[i].SetPosition(Vector3(-boundaryVector.x - (currentPosition.x + boundaryVector.x), currentPosition.y, currentPosition.z));
+        atoms[i].SetVelocity(Vector3(-currentVelocity.x, currentVelocity.y, currentVelocity.z));
+    }
+    
+    if (currentPosition.y > boundaryVector.y) {
+        atoms[i].SetPosition(Vector3(currentPosition.x, boundaryVector.y - (currentPosition.y - boundaryVector.y), currentPosition.z));
         atoms[i].SetVelocity(Vector3(currentVelocity.x, -currentVelocity.y, currentVelocity.z));
-    }
-    if (currentPosition.x >= boundaryVector.z || currentPosition.z <= -boundaryVector.z) {
-        atoms[i].SetPosition(Vector3(boundaryVector.z - (currentPosition.z - boundaryVector.z), currentPosition.y, currentPosition.z));
+     }
+    else if (currentPosition.y < -boundaryVector.y) {
+        atoms[i].SetPosition(Vector3(currentPosition.x, -boundaryVector.y - (currentPosition.y + boundaryVector.y), currentPosition.z));
+        atoms[i].SetVelocity(Vector3(currentVelocity.x, -currentVelocity.y, currentVelocity.z));
+     }
+
+    if (currentPosition.z > boundaryVector.z) {
+        atoms[i].SetPosition(Vector3(currentPosition.x, currentPosition.y, boundaryVector.z - (currentPosition.z - boundaryVector.z)));
         atoms[i].SetVelocity(Vector3(currentVelocity.x, currentVelocity.y, -currentVelocity.z));
-    }
+     }
+    else if (currentPosition.z < -boundaryVector.z) {
+        atoms[i].SetPosition(Vector3(currentPosition.x, currentPosition.y, -boundaryVector.z - (currentPosition.z + boundaryVector.z)));
+        atoms[i].SetVelocity(Vector3(currentVelocity.x, currentVelocity.y, -currentVelocity.z));
+     }
 }
 
 
@@ -147,7 +174,7 @@ double System::potential(double r, double eps, double sig)
 
 double System::field(double r, double eps, double sig)
 {
-    return (24 * eps * pow(sig, 6) * (pow(r, 6) - 2 * pow(sig, 6))) / pow(r, 13);
+    return - (24 * eps * pow(sig, 6) * (2 * pow(sig, 6) - pow(r, 6))) / pow(r, 13);
 }
 
 void System::createSimulationHeader(ofstream &savefile)

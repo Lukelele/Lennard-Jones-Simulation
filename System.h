@@ -22,7 +22,7 @@ public:
 private:
     vector<Atom> atoms;
     
-    void updateAcceleration(int atomIndex);
+    void updateAcceleration();
     void updateOnRebound(Vector3 boundaryVector, int atomIndex);
     
     double potential(double r, double eps=1.73466e-21, double sig=0.3345e-9);
