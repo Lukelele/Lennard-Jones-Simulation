@@ -8,9 +8,9 @@ double field(double r, double eps=1.73466e-21, double sig=0.3345e-9)
 }
 
 int main(int argc, const char * argv[]) {
-    System system("/Users/lukelele/Documents/Scientific Computing/Year 2/Assessments/Assessment4/FinalAssessment/FinalAssessment/input.txt");
+    System system("FinalAssessment/input.txt");
 
-    float simulationTime = 4e-11;
-    float dt = simulationTime / 4000;
-    system.Simulate(simulationTime, dt);
+    float simulationTime = 3e-11;
+    float dt = simulationTime / 10000;
+    system.Simulate(simulationTime, dt, Vector3(1e-9, 1e-9, 1e-9));
 }

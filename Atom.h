@@ -18,9 +18,12 @@ public:
     Vector3 GetAcceleration();
     void SetMass(double inputMass);
     double GetMass();
+    void SetMomentum(double inputMomentum);
+    double GetMomentum();
 private:
     Vector3 position;
     Vector3 velocity;
     Vector3 acceleration;
     double mass;
+    double momentum;
 };

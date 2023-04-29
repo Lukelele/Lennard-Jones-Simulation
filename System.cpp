@@ -72,6 +72,17 @@ void System::Simulate(float duration, float dt, Vector3 simulationBox)
 {
     ofstream savefile;
     savefile.open("/Users/lukelele/Documents/Scientific Computing/Year 2/Assessments/Assessment4/FinalAssessment/FinalAssessment/output.csv");
+    ofstream metafile;
+    metafile.open("/Users/lukelele/Documents/Scientific Computing/Year 2/Assessments/Assessment4/FinalAssessment/FinalAssessment/meta.csv");
+    
+    if (!metafile.is_open()) {
+        cout << "meta file cannot be opened" << endl;
+        return;
+    }
+    
+    metafile << "n_particles" << ',' << "box_x" << ',' << "box_y" << ',' << "box_z" << endl;
+    metafile << atoms.size() << ',' << simulationBox.x << ',' << simulationBox.y << ',' << simulationBox.z << endl;
+    
     if (!savefile.is_open()) {
         cout << "save file cannot be opened" << endl;
         return;
@@ -80,30 +91,40 @@ void System::Simulate(float duration, float dt, Vector3 simulationBox)
     createSimulationHeader(savefile);
     
     for (float t = 0; t < duration; t += dt) {
-        savefile << to_string(t * 1e9) << ',';
+        savefile << t << ',';
+        pressureFrame = 0;
+        temperature = 0;
+        kineticEnergy = 0;
+        potentialEnergy = 0;
         
+        //Verlet integration algorithm
+        //|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
         for (int i = 0; i < atoms.size(); i++) {
             Vector3 currentPosition = atoms[i].GetPosition();
             Vector3 currentVelocity = atoms[i].GetVelocity();
             Vector3 currentAcceleration = atoms[i].GetAcceleration();
 
             atoms[i].SetVelocity(currentVelocity + currentAcceleration * 0.5 * dt);
-            atoms[i].SetPosition(currentPosition + currentVelocity * dt + currentAcceleration * 0.5 * dt * dt);
+            //check if the particle is out of the boudaries before setting the position
+            updateOnRebound(simulationBox, i, dt);
+            atoms[i].SetPosition(currentPosition + atoms[i].GetVelocity() * dt);
             
-            //updateOnRebound(Vector3(3, 3, 3), i);
-            
-            if (i == 0) {
-                cout << atoms[i].GetPosition().x - atoms[1].GetPosition().x << "  " << atoms[i].GetPosition().y - atoms[1].GetPosition().y << "  " << atoms[i].GetPosition().z - atoms[1].GetPosition().z << "  |||   " << atoms[i].GetAcceleration().x * 6.6335209e-26 << "  " << atoms[i].GetAcceleration().y *6.6335209e-26 << "  " << atoms[i].GetAcceleration().z * 6.6335209e-26 << endl;;
-            }
-            
+            kineticEnergy += 0.5 * atoms[i].GetMass() * pow(atoms[i].GetVelocity().Magnitude(), 2);
+
+            //log the particle data into a .csv file
             logSimulationData(savefile, i);
         }
         
+        temperature = (double)(2.0f / 3.0f) * kineticEnergy / (atoms.size() * 1.38e-23);
+        calculatePotential();
         updateAcceleration();
         
         for (int i = 0; i < atoms.size(); i++) {
             atoms[i].SetVelocity(atoms[i].GetVelocity() + atoms[i].GetAcceleration() * 0.5 * dt);
         }
+        //|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+        
+        savefile << pressureFrame << ',' << potentialEnergy << ',' << kineticEnergy << ',' << temperature;
         
         savefile << endl;
     }
@@ -123,16 +144,29 @@ void System::updateAcceleration()
         //for each body, loop through all other bodies except for itself to calculate the acceleration according to equation1
         for (int j = 0; j < atoms.size(); j++) {
             if (i != j) {
-                acc = acc + (atoms[j].GetPosition() - atoms[i].GetPosition()).Normalise() * field((atoms[j].GetPosition() - atoms[i].GetPosition()).Magnitude()) / atoms[i].GetMass();
+                acc = acc + (atoms[i].GetPosition() - atoms[j].GetPosition()).Normalise() * (field((atoms[i].GetPosition() - atoms[j].GetPosition()).Magnitude()));
             }
         }
         //update the acceleration at the end of the i loop
-        atoms[i].SetAcceleration(acc);
+        atoms[i].SetAcceleration(acc / atoms[i].GetMass());
+    }
+}
+
+void System::calculatePotential()
+{
+    // loop through the system twice, for each body, add all the potential contribution from other bodies
+    for (int i = 0; i < atoms.size(); i++) {
+        for (int j = 0; j < atoms.size(); j++) {
+            // if the body is not itself, do calculatiom shown in equation 7 and update the gpe variable each time
+            if (i != j) {
+                potentialEnergy += potential((atoms[i].GetPosition() - atoms[j].GetPosition()).Magnitude());
+            }
+        }
     }
 }
 
 
-void System::updateOnRebound(Vector3 boundaryVector, int i)
+void System::updateOnRebound(Vector3 boundaryVector, int i, double dt)
 {
     Vector3 currentPosition = atoms[i].GetPosition();
     Vector3 currentVelocity = atoms[i].GetVelocity();
@@ -141,28 +175,40 @@ void System::updateOnRebound(Vector3 boundaryVector, int i)
         // if the particle goes out of bounds in between frames, it means it must rebound in the time between frames and have already travelled back a distance, simply reversing the velocity does not address the problem that the particle has travelled extra distance, therefore this extra distance has to be offset in the opposite direction before the next frame
         atoms[i].SetPosition(Vector3(boundaryVector.x - (currentPosition.x - boundaryVector.x), currentPosition.y, currentPosition.z));
         atoms[i].SetVelocity(Vector3(-currentVelocity.x, currentVelocity.y, currentVelocity.z));
+        
+        pressureFrame += 2 * abs(currentVelocity.x) * atoms[i].GetMass() / (boundaryVector.x * 2 + boundaryVector.y * 2 + boundaryVector.z * 2 * dt);
     }
     else if (currentPosition.x < -boundaryVector.x) {
         atoms[i].SetPosition(Vector3(-boundaryVector.x - (currentPosition.x + boundaryVector.x), currentPosition.y, currentPosition.z));
         atoms[i].SetVelocity(Vector3(-currentVelocity.x, currentVelocity.y, currentVelocity.z));
+        
+        pressureFrame += 2 * abs(currentVelocity.x) * atoms[i].GetMass() / (boundaryVector.x * 2 + boundaryVector.y * 2 + boundaryVector.z * 2 * dt);
     }
     
     if (currentPosition.y > boundaryVector.y) {
         atoms[i].SetPosition(Vector3(currentPosition.x, boundaryVector.y - (currentPosition.y - boundaryVector.y), currentPosition.z));
         atoms[i].SetVelocity(Vector3(currentVelocity.x, -currentVelocity.y, currentVelocity.z));
+        
+        pressureFrame += 2 * abs(currentVelocity.y) * atoms[i].GetMass() / (boundaryVector.x * 2 + boundaryVector.y * 2 + boundaryVector.z * 2 * dt);
      }
     else if (currentPosition.y < -boundaryVector.y) {
         atoms[i].SetPosition(Vector3(currentPosition.x, -boundaryVector.y - (currentPosition.y + boundaryVector.y), currentPosition.z));
         atoms[i].SetVelocity(Vector3(currentVelocity.x, -currentVelocity.y, currentVelocity.z));
+        
+        pressureFrame += 2 * abs(currentVelocity.y) * atoms[i].GetMass() / (boundaryVector.x * 2 + boundaryVector.y * 2 + boundaryVector.z * 2 * dt);
      }
 
     if (currentPosition.z > boundaryVector.z) {
         atoms[i].SetPosition(Vector3(currentPosition.x, currentPosition.y, boundaryVector.z - (currentPosition.z - boundaryVector.z)));
         atoms[i].SetVelocity(Vector3(currentVelocity.x, currentVelocity.y, -currentVelocity.z));
+        
+        pressureFrame += 2 * abs(currentVelocity.z) * atoms[i].GetMass() / (boundaryVector.x * 2 + boundaryVector.y * 2 + boundaryVector.z * 2 * dt);
      }
     else if (currentPosition.z < -boundaryVector.z) {
         atoms[i].SetPosition(Vector3(currentPosition.x, currentPosition.y, -boundaryVector.z - (currentPosition.z + boundaryVector.z)));
         atoms[i].SetVelocity(Vector3(currentVelocity.x, currentVelocity.y, -currentVelocity.z));
+        
+        pressureFrame += 2 * abs(currentVelocity.z) * atoms[i].GetMass() / (boundaryVector.x * 2 + boundaryVector.y * 2 + boundaryVector.z * 2 * dt);
      }
 }
 
@@ -174,7 +220,8 @@ double System::potential(double r, double eps, double sig)
 
 double System::field(double r, double eps, double sig)
 {
-    return - (24 * eps * pow(sig, 6) * (2 * pow(sig, 6) - pow(r, 6))) / pow(r, 13);
+//    return (24 * eps * pow(sig, 6) * (2 * pow(sig, 6) - pow(r, 6))) / pow(r, 13);
+    return -4 * eps * ((6 * pow(sig, 6)) / pow(r, 7) - 12 * pow(sig, 12) / pow(r, 13));
 }
 
 void System::createSimulationHeader(ofstream &savefile)
@@ -193,18 +240,20 @@ void System::createSimulationHeader(ofstream &savefile)
         savefile << "atom" << i << "_az" << ',';
     }
     
+    savefile << "pressure" << ',' << "PE" << ',' << "KE" << ',' << "temperature";
+    
     savefile << endl;
 }
 
 void System::logSimulationData(ofstream &savefile, int i)
 {
-    savefile << to_string(atoms[i].GetPosition().x * 1e9) << ',';
-    savefile << to_string(atoms[i].GetPosition().y * 1e9) << ',';
-    savefile << to_string(atoms[i].GetPosition().z * 1e9) << ',';
-    savefile << to_string(atoms[i].GetVelocity().x * 1e9) << ',';
-    savefile << to_string(atoms[i].GetVelocity().y * 1e9) << ',';
-    savefile << to_string(atoms[i].GetVelocity().z * 1e9) << ',';
-    savefile << to_string(atoms[i].GetAcceleration().x * 1e9) << ',';
-    savefile << to_string(atoms[i].GetAcceleration().y * 1e9) << ',';
-    savefile << to_string(atoms[i].GetAcceleration().z * 1e9) << ',';
+    savefile << atoms[i].GetPosition().x << ',';
+    savefile << atoms[i].GetPosition().y << ',';
+    savefile << atoms[i].GetPosition().z << ',';
+    savefile << atoms[i].GetVelocity().x << ',';
+    savefile << atoms[i].GetVelocity().y << ',';
+    savefile << atoms[i].GetVelocity().z << ',';
+    savefile << atoms[i].GetAcceleration().x << ',';
+    savefile << atoms[i].GetAcceleration().y << ',';
+    savefile << atoms[i].GetAcceleration().z << ',';
 }

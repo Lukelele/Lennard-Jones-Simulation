@@ -54,3 +54,13 @@ double Atom::GetMass()
 {
     return mass;
 }
+
+void Atom::SetMomentum(double inputMomentum)
+{
+    momentum = inputMomentum;
+}
+
+double Atom::GetMomentum()
+{
+    return momentum;
+}

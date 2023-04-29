@@ -22,11 +22,18 @@ public:
 private:
     vector<Atom> atoms;
     
+    double pressureFrame;
+    double kineticEnergy;
+    double temperature;
+    double potentialEnergy;
+    
     void updateAcceleration();
-    void updateOnRebound(Vector3 boundaryVector, int atomIndex);
+    void calculatePotential();
+    void updateOnRebound(Vector3 boundaryVector, int atomIndex, double dt);
     
     double potential(double r, double eps=1.73466e-21, double sig=0.3345e-9);
     double field(double r, double eps=1.73466e-21, double sig=0.3345e-9);
+    
     void createSimulationHeader(ofstream &savefile);
     void logSimulationData(ofstream &savefile, int i);
 };
