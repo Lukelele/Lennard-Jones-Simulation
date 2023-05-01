@@ -11,6 +11,6 @@ int main(int argc, const char * argv[]) {
     System system("FinalAssessment/input.txt");
 
     float simulationTime = 3e-11;
-    float dt = simulationTime / 10000;
+    float dt = simulationTime / 1000;
     system.Simulate(simulationTime, dt, Vector3(1e-9, 1e-9, 1e-9));
 }

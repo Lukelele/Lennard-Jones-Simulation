@@ -22,7 +22,7 @@ public:
 private:
     vector<Atom> atoms;
     
-    double pressureFrame;
+    Vector3 pressureFrame;
     double kineticEnergy;
     double temperature;
     double potentialEnergy;
@@ -30,6 +30,7 @@ private:
     void updateAcceleration();
     void calculatePotential();
     void updateOnRebound(Vector3 boundaryVector, int atomIndex, double dt);
+    void calculatePressure(double dt, Vector3 boundary);
     
     double potential(double r, double eps=1.73466e-21, double sig=0.3345e-9);
     double field(double r, double eps=1.73466e-21, double sig=0.3345e-9);

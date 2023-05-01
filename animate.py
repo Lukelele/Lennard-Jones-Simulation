@@ -1,4 +1,5 @@
 
+import os
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -6,10 +7,20 @@ from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.animation as animation
 
 
-df = pd.read_csv('output.csv', low_memory=False)
-meta_df = pd.read_csv('meta.csv')
+#list all files in Output directory
+files = os.listdir('Output')
 
-num_particles = int(meta_df['n_particles'])
+for i, file in enumerate(files):
+    print(str(i) + ": " + file)
+
+index = int(input("Enter the index of the file you want to animate: "))
+
+df = pd.read_csv("Output/" + files[index], low_memory=False)
+
+file_list = files[index].split("_")
+
+num_particles = int(file_list[0])
+axisScale = float(file_list[1].split('.')[0])
 frames = len(df['time'])
 
 #create numpy array with shape (frames, 2)
@@ -26,8 +37,6 @@ x = x.T
 y = y.T
 z = z.T
 
-
-axisScale = float(meta_df["box_x"])
 
 fig= plt.figure()
 ax = fig.add_subplot(projection="3d")
@@ -46,7 +55,7 @@ ax.set_zlabel('Z')
 def update(i):
     points.set_data(x[i], y[i])
     points.set_3d_properties(z[i])
-    ax.set_title(f"Time: {df['time'][i]} 10-9 s\Kinetic: {df['temperature'][i]}\nPressure: {df['PE'][i]}")
+    ax.set_title(f"Time: {df['time'][i]} 10-9 s\Kinetic: {df['temperature'][i]}\n")
     return points,
 
 

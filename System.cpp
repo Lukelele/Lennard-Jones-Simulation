@@ -70,19 +70,13 @@ void System::ReadFromTXT(const char* filepath)
 
 void System::Simulate(float duration, float dt, Vector3 simulationBox)
 {
+    //Opening a file for output data
     ofstream savefile;
-    savefile.open("/Users/lukelele/Documents/Scientific Computing/Year 2/Assessments/Assessment4/FinalAssessment/FinalAssessment/output.csv");
-    ofstream metafile;
-    metafile.open("/Users/lukelele/Documents/Scientific Computing/Year 2/Assessments/Assessment4/FinalAssessment/FinalAssessment/meta.csv");
-    
-    if (!metafile.is_open()) {
-        cout << "meta file cannot be opened" << endl;
-        return;
-    }
-    
-    metafile << "n_particles" << ',' << "box_x" << ',' << "box_y" << ',' << "box_z" << endl;
-    metafile << atoms.size() << ',' << simulationBox.x << ',' << simulationBox.y << ',' << simulationBox.z << endl;
-    
+    //stringstream to combine file path with the simulation metadata
+    stringstream oss;
+    oss << "/Users/lukelele/Documents/Scientific Computing/Year 2/Assessments/Assessment4/FinalAssessment/FinalAssessment/Output/" << atoms.size() << '_' << simulationBox.x << ".csv";
+    savefile.open(oss.str().c_str());
+
     if (!savefile.is_open()) {
         cout << "save file cannot be opened" << endl;
         return;
@@ -92,7 +86,8 @@ void System::Simulate(float duration, float dt, Vector3 simulationBox)
     
     for (float t = 0; t < duration; t += dt) {
         savefile << t << ',';
-        pressureFrame = 0;
+        //initialise system wide variables
+        pressureFrame = Vector3(0,0,0);
         temperature = 0;
         kineticEnergy = 0;
         potentialEnergy = 0;
@@ -117,14 +112,18 @@ void System::Simulate(float duration, float dt, Vector3 simulationBox)
         
         temperature = (double)(2.0f / 3.0f) * kineticEnergy / (atoms.size() * 1.38e-23);
         calculatePotential();
+        calculatePressure(dt, simulationBox);
         updateAcceleration();
+        
         
         for (int i = 0; i < atoms.size(); i++) {
             atoms[i].SetVelocity(atoms[i].GetVelocity() + atoms[i].GetAcceleration() * 0.5 * dt);
         }
         //|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
         
-        savefile << pressureFrame << ',' << potentialEnergy << ',' << kineticEnergy << ',' << temperature;
+        savefile << pressureFrame.x << ',' << pressureFrame.y << ',' << pressureFrame.z << ',' << potentialEnergy << ',' << kineticEnergy << ',' << temperature;
+        
+        //cout << pressureFrame.x << "  " << pressureFrame.y << "  " << pressureFrame.z << endl;
         
         savefile << endl;
     }
@@ -175,41 +174,46 @@ void System::updateOnRebound(Vector3 boundaryVector, int i, double dt)
         // if the particle goes out of bounds in between frames, it means it must rebound in the time between frames and have already travelled back a distance, simply reversing the velocity does not address the problem that the particle has travelled extra distance, therefore this extra distance has to be offset in the opposite direction before the next frame
         atoms[i].SetPosition(Vector3(boundaryVector.x - (currentPosition.x - boundaryVector.x), currentPosition.y, currentPosition.z));
         atoms[i].SetVelocity(Vector3(-currentVelocity.x, currentVelocity.y, currentVelocity.z));
-        
-        pressureFrame += 2 * abs(currentVelocity.x) * atoms[i].GetMass() / (boundaryVector.x * 2 + boundaryVector.y * 2 + boundaryVector.z * 2 * dt);
     }
     else if (currentPosition.x < -boundaryVector.x) {
         atoms[i].SetPosition(Vector3(-boundaryVector.x - (currentPosition.x + boundaryVector.x), currentPosition.y, currentPosition.z));
         atoms[i].SetVelocity(Vector3(-currentVelocity.x, currentVelocity.y, currentVelocity.z));
-        
-        pressureFrame += 2 * abs(currentVelocity.x) * atoms[i].GetMass() / (boundaryVector.x * 2 + boundaryVector.y * 2 + boundaryVector.z * 2 * dt);
     }
     
     if (currentPosition.y > boundaryVector.y) {
         atoms[i].SetPosition(Vector3(currentPosition.x, boundaryVector.y - (currentPosition.y - boundaryVector.y), currentPosition.z));
         atoms[i].SetVelocity(Vector3(currentVelocity.x, -currentVelocity.y, currentVelocity.z));
-        
-        pressureFrame += 2 * abs(currentVelocity.y) * atoms[i].GetMass() / (boundaryVector.x * 2 + boundaryVector.y * 2 + boundaryVector.z * 2 * dt);
      }
     else if (currentPosition.y < -boundaryVector.y) {
         atoms[i].SetPosition(Vector3(currentPosition.x, -boundaryVector.y - (currentPosition.y + boundaryVector.y), currentPosition.z));
         atoms[i].SetVelocity(Vector3(currentVelocity.x, -currentVelocity.y, currentVelocity.z));
-        
-        pressureFrame += 2 * abs(currentVelocity.y) * atoms[i].GetMass() / (boundaryVector.x * 2 + boundaryVector.y * 2 + boundaryVector.z * 2 * dt);
      }
 
     if (currentPosition.z > boundaryVector.z) {
         atoms[i].SetPosition(Vector3(currentPosition.x, currentPosition.y, boundaryVector.z - (currentPosition.z - boundaryVector.z)));
         atoms[i].SetVelocity(Vector3(currentVelocity.x, currentVelocity.y, -currentVelocity.z));
-        
-        pressureFrame += 2 * abs(currentVelocity.z) * atoms[i].GetMass() / (boundaryVector.x * 2 + boundaryVector.y * 2 + boundaryVector.z * 2 * dt);
      }
     else if (currentPosition.z < -boundaryVector.z) {
         atoms[i].SetPosition(Vector3(currentPosition.x, currentPosition.y, -boundaryVector.z - (currentPosition.z + boundaryVector.z)));
         atoms[i].SetVelocity(Vector3(currentVelocity.x, currentVelocity.y, -currentVelocity.z));
-        
-        pressureFrame += 2 * abs(currentVelocity.z) * atoms[i].GetMass() / (boundaryVector.x * 2 + boundaryVector.y * 2 + boundaryVector.z * 2 * dt);
      }
+}
+
+void System::calculatePressure(double dt, Vector3 boundary)
+{
+    //loop through all atoms, 3 imagineary surfaces are set up around the origin, if the atom crosses any of the surfaces, a pressure has been exerted on that surface
+    for (int i = 0; i < atoms.size(); i++) {
+        // if the current position multiplied by the position in the next frame is negative it must mean the atom has crossed the origin
+        if ((atoms[i].GetPosition().x + atoms[i].GetVelocity().x * dt) * atoms[i].GetPosition().x < 0) {
+            pressureFrame.x +=  abs(atoms[i].GetVelocity().x) * atoms[i].GetMass() / (2 * boundary.x * boundary.x + 2 * boundary.y * boundary.y + 2 * boundary.z + boundary.z * dt);
+        }
+        if ((atoms[i].GetPosition().y + atoms[i].GetVelocity().y * dt) * atoms[i].GetPosition().y < 0) {
+            pressureFrame.y +=  abs(atoms[i].GetVelocity().y) * atoms[i].GetMass() / (2 * boundary.x * boundary.x + 2 * boundary.y * boundary.y + 2 * boundary.z + boundary.z * dt);
+        }
+        if ((atoms[i].GetPosition().z + atoms[i].GetVelocity().z * dt) * atoms[i].GetPosition().z < 0) {
+            pressureFrame.z +=  abs(atoms[i].GetVelocity().z) * atoms[i].GetMass() / (2 * boundary.x * boundary.x + 2 * boundary.y * boundary.y + 2 * boundary.z + boundary.z * dt);
+        }
+    }
 }
 
 
@@ -220,7 +224,6 @@ double System::potential(double r, double eps, double sig)
 
 double System::field(double r, double eps, double sig)
 {
-//    return (24 * eps * pow(sig, 6) * (2 * pow(sig, 6) - pow(r, 6))) / pow(r, 13);
     return -4 * eps * ((6 * pow(sig, 6)) / pow(r, 7) - 12 * pow(sig, 12) / pow(r, 13));
 }
 
@@ -240,7 +243,7 @@ void System::createSimulationHeader(ofstream &savefile)
         savefile << "atom" << i << "_az" << ',';
     }
     
-    savefile << "pressure" << ',' << "PE" << ',' << "KE" << ',' << "temperature";
+    savefile << "pressure_x" << ',' << "pressure_y" << ',' << "pressure_z"  << ',' << "PE" << ',' << "KE" << ',' << "temperature";
     
     savefile << endl;
 }
